@@ -9,6 +9,8 @@ def calculate_stats(numbers):
     std_dev = stdev(numbers)
     return {"mean": mean_value, "std_dev": std_dev}
 
+    
+
 # Example usage
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 stats = calculate_stats(numbers)
