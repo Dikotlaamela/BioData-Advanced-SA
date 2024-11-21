@@ -1,0 +1,216 @@
+---
+title: "Some mapping tools for environment layers"
+subtitle: "BioDATA Advanced, data use course, Kruger National Park"
+author: "Dag Endresen, https://orcid.org/0000-0002-2352-5497"
+date: "November 18-22, 2024"
+output:
+  html_document:
+    keep_md: false
+    toc: true
+    toc_depth: 3
+---
+
+<!-- mapping.html is generated from mapping.Rmd. Please edit that file -->
+
+***
+
+You are here: [R workshop](./index.html) >> **mapping demo**
+
+***
+
+# GBIF data access using R: Mapping demo
+
+This session focuses on working with environment layers, mapping, cropping and masking layers using the [Raster R-package](https://cran.r-project.org/web/packages/raster/index.html) and other tools. See also the [Biostats making maps with R](https://biostats-r.github.io/biostats/workingInR/140_maps.html) training resource.
+
+***
+
+## GBIF data for taxon king protea (Protea cynaroides) - from South Africa
+```{r eval=FALSE}
+library('rgbif') # rOpenSci r-package for GBIF data
+library('mapr') # rOpenSci r-package for mapping (occurrence data)
+library('leaflet') # package to plot the Leaflet map
+sp_name <- "Protea cynaroides"; kingdom <- "Plantae" # king protea, taxonKey=5637947
+key <- rgbif::name_backbone(name=sp_name, kingdom=kingdom)$speciesKey
+sp <- rgbif::occ_search(taxonKey=key, hasCoordinate=TRUE, country="ZA", limit=100)
+sp_ZA = sp$data ### extracting the data table from the data frame
+sp_ZA_m <- sp$data[c("name", "catalogNumber", "decimalLongitude","decimalLatitude", "basisOfRecord", "year", "stateProvince", "taxonKey", "occurrenceID")] ## Subset columns (for more useful map pop-up)
+xy_ZA <- sp$data[c("decimalLongitude","decimalLatitude")] ## Extract coordinates
+sp_ZA_xy <- sp$data[c("species", "decimalLongitude","decimalLatitude")] ## Input format for Maxent
+leaflet() %>% addTiles() %>% addMarkers(lng = sp_ZA$decimalLongitude, lat = sp_ZA$decimalLatitude)
+```
+![Map GBIF data for Protea cynaroides from South Africa](./mapping_data/map_sp_ZA.png "Leaflet map")
+
+***
+
+## GBIF data for taxon liverleaf (bl&aring;veis:no) - from Norway
+```{r eval=FALSE}
+library('rgbif') # rOpenSci r-package for GBIF data
+library('mapr') # rOpenSci r-package for mapping (occurrence data)
+library('leaflet') # package to plot the Leaflet map
+sp_name <- "Hepatica nobilis"; kingdom <- "Plantae" # liverleaf (blaaveis:no), taxonKey=5371699
+key <- rgbif::name_backbone(name=sp_name, kingdom=kingdom)$speciesKey
+sp <- rgbif::occ_search(taxonKey=key, hasCoordinate=TRUE, country="NO", limit=100)
+sp_NO <- sp$data
+sp_NO_m <- sp$data[c("name", "catalogNumber", "decimalLongitude","decimalLatitude", "basisOfRecord", "year", "municipality", "taxonKey", "occurrenceID")] ## Subset columns (for more useful map pop-up)
+xy_NO <- sp$data[c("decimalLongitude","decimalLatitude")] ## Extract only the coordinates
+sp_NO_xy <- sp$data[c("species", "decimalLongitude","decimalLatitude")] ## Input format for Maxent
+### rgbif::gbifmap(sp, region = "norway") ### defunct gbifmap deprectated March 2023
+### mapr::map_leaflet(sp_m, "decimalLongitude", "decimalLatitude", size=2, color="blue") ### defunct mapr deprectated March 2023
+leaflet() %>% addTiles() %>% addMarkers(lng = sp_NO$decimalLongitude, lat = sp_NO$decimalLatitude)
+```
+![Map GBIF data for Hepatica nobilis from Norway](./mapping_data/map_sp_NO.png "Leaflet map, Norway")
+
+***
+***
+***
+
+## Extract coordinates suitable for e.g. Maxent
+```{r eval=FALSE}
+library('utils')
+xy <- sp$data[c("decimalLongitude","decimalLatitude")] ## Extract only the coordinates
+sp_xy <- sp$data[c("species", "decimalLongitude","decimalLatitude")] ## Input format for Maxent
+#utils::write.table(sp_xy, file="./mapping_data/sp_xy.txt", sep="\t", row.names=FALSE, qmethod="double")
+#readLines("./mapping_data/sp_xy.txt", n=10)
+```
+
+## Write example species occurrence data from R to file
+```{r eval=FALSE}
+#head(sp_ZA, n=5) ## preview first 5 records
+utils::write.table(sp_NO, file="./mapping_data/sp_NO.txt", sep="\t", row.names=FALSE, qmethod="double") ## write to file
+utils::write.table(sp_ZA, file="./mapping_data/sp_ZA.txt", sep="\t", row.names=FALSE, qmethod="double") ## write to file
+## Extract coordinates
+xy_NO <- sp_NO[c("decimalLongitude","decimalLatitude")] ## Extract coordinates
+xy_ZA <- sp_ZA[c("decimalLongitude","decimalLatitude")] ## Extract coordinates
+```
+
+## Read example species occurrence data into R
+```{r eval=FALSE}
+sp_ZA <- utils::read.delim("./mapping_data/sp_ZA.txt", header=TRUE, dec=".", stringsAsFactors=FALSE) ## read from file
+sp_NO <- utils::read.delim("./mapping_data/sp_NO.txt", header=TRUE, dec=".", stringsAsFactors=FALSE) ## read from file
+#head(sp_ZA, n=5) ## preview first 5 records
+```
+
+***
+***
+***
+
+## Get administrative borders for South Africa from GADM
+```{r eval=FALSE}
+#install.packages("geodata")
+library(geodata)
+gadm_ZA_1 <- gadm('ZAF', level=1, path="./demo_data/gadm", resolution=2) ## level 0,1,2,...
+plot(gadm_ZA_1, main="Adm. Boundaries South Africa Level 1")
+points(xy_ZA, col='red', pch=20) ## plot species occurrence points to the map (smaller dots)
+legend("top", title = "Legend", legend = "Protea cynaroides", pch = 20, pt.bg = "red", bty = "n")
+```
+![GADM Norway](./mapping_data/gadm_ZA_sp.png "GADM admin borders for Norway")
+
+## Get administrative borders for Norway from GADM
+Slow to render, many details for the coast...
+```{r eval=FALSE}
+#install.packages("geodata")
+library(geodata)
+gadm_NO_1 <- gadm('NOR', level=1, path="./demo_data/gadm/", resolution=2) ## level 0,1,2,...
+plot(gadm_NO_1, main="Adm. Boundaries Norway Level 1")
+points(xy_NO, col='blue', pch=20) ## plot species occurrence points to the map (smaller dots)
+legend("bottom", title = "Legend", legend = "H. nobilis", pch = 20, pt.bg = "blue", bty = "n")
+```
+
+![GADM Norway](./mapping_data/gadm_NO_sp.png "GADM admin borders for Norway")
+
+***
+***
+
+## Get world map from rworldmap
+
+```{r message=FALSE, eval=FALSE}
+library(rworldmap)
+worldmap <- getMap(resolution = "coarse") ## getting a simple world map
+plot(worldmap, col = "lightgrey", 
+     border = "darkgray",
+     xlim = c(-180, 180), ylim = c(-90, 90),
+     bg = "aliceblue",
+     asp = 1)
+points(xy_NO, col='blue', pch=20, cex=1) # plot species occurrence points to the map
+points(xy_ZA, col='red', pch=20, cex=1) # plot species occurrence points to the map
+title("World map with some GBIF data points")
+```
+![Border for Norway from maptool:wrld_simpl](./mapping_data/rworldmap_sp.png "maptools wrld_simpl")
+## Extracting vector for one country (under development - TODO)
+
+```{r message=FALSE, eval=FALSE}
+library(rworldmap)
+map_NO <- gadm(NOR, level=0, path="./demo_data/gadm/")
+plot(map_NO)
+#points(xy_NO, col='blue', pch=20, cex=1) # plot species occurrence points to the map
+#points(xy_ZA, col='red', pch=20, cex=1) # plot species occurrence points to the map
+title("Country map with some GBIF data points")
+```
+
+
+***
+***
+
+## Base map from Google
+```{r eval=FALSE}
+library(dismo)
+g_no <- gmap("Norway")
+trd <- geocode('Trondheim, Norway')
+osl <- geocode('Oslo, Norway')
+trd_merc <- Mercator(trd[, c('longitude', 'latitude')])
+osl_merc <- Mercator(osl[, c('longitude', 'latitude')])
+xy_merc <- Mercator(xy)
+##
+plot(g_no, interpolate=TRUE)
+points(xy_merc, pch=20, col='blue') ## add species occurrence
+points(trd_merc, pch='*', col='red', cex=3) ## add * for Trondheim
+points(osl_merc, pch='*', col='red', cex=3) ## add * for Oslo
+```
+![Base map from Google, with *H. nobilis*, Trondheim, Oslo](./mapping_data/map_google_sp.png "Base map")
+
+***
+
+## Testing remote sensing image for Trondheim downloaded from Landsat
+I used the [USGS](https://landsat.usgs.gov/landsat-data-access) [LandsatLook Viewer](https://landsatlook.usgs.gov/) and [Sentinel2Look Viewer](https://landsatlook.usgs.gov/sentinel2/) to download sattelite data for Trondheim.
+
+```{r eval=FALSE}
+## A rasterBrick is a multi-layer raster object (similar to a rasterStack)
+rs_l <- brick('./demo_data/landsat_trondheim_web_mercartor_wgs84.tif')
+rs_s <- brick('./demo_data/sentinel_trondheim_web_mercartor_wgs84.tif')
+nlayers(rs_l); nlayers(rs_s) ## result = 3 layers
+crs(rs_l); crs(rs_s) ## +proj=merc +a=6378137 +b=6378137 ... +units=m ...
+ncell(rs_l); ncell(rs_s) ## rs_l = 100738 ## rs_s = 204530
+dim(rs_l); dim(rs_s) ## rs_l = 241 418   3 ## rs_s = 362 565   3
+res(rs_l);res(rs_s) ## rs_l = 30.09113 30.09113 ## rs_s = 20.03305 20.03305
+#par(mfrow=c(2,1)) ## combining two plot with par(n_rows, n_columns) ## if landsat & sentinel
+#plotRGB(rs_l, stretch="lin", axes=FALSE, main="Landsat True Color Composite") ## Landsat example
+plotRGB(rs_s, stretch="lin", axes=FALSE, main="Sentinel True Color Composite") ## Sentinel example
+```
+![Remote sensing data, sentinel, Trondheim](./mapping_data/sentinel_trondheim.png "Sentinel remote sensing")
+
+***
+***
+
+## GBIF data for taxon liverleaf (bl&aring;veis:no) - from Trondheim
+```{r eval=FALSE}
+library('rgbif') # rOpenSci r-package for GBIF data
+library('mapr') # rOpenSci r-package for mapping (occurrence data)
+sp_name <- "Hepatica nobilis"; kingdom <- "Plantae" # liverleaf (blaaveis:no), taxonKey=5371699
+key <- rgbif::name_backbone(name=sp_name, kingdom=kingdom)$speciesKey
+bb <- c(10.2,63.3,10.6,63.5) # Trondheim
+#bb <- c(5.25, 60.3, 5.4, 60.4) # Bergen
+#bb <- c(18.7, 69.6, 19.2, 69.8) # Tromsoe
+#bb <- c(10.6, 59.9, 10.9, 60.0) # Oslo
+sp_bb <- rgbif::occ_search(taxonKey=key, return="data", hasCoordinate=TRUE, country="NO", geometry=bb, limit=100)
+sp_bb_m <- sp_bb[c("name", "catalogNumber", "decimalLongitude","decimalLatitude", "basisOfRecord", "year", "municipality", "taxonKey", "occurrenceID")] ## Subset columns
+mapr::map_leaflet(sp_bb_m, "decimalLongitude", "decimalLatitude", size=2, color="blue")
+```
+![Map GBIF data with bounding box for Trondheim](./mapping_data/map_sp_trondheim.png "Leaflet map, Trondheim")
+
+
+***
+
+Navigate to [GitHub workshop home](https://github.com/GBIF-Europe/nordic_oikos_2018_r) or [GitHub.io html](https://gbif-europe.github.io/nordic_oikos_2018_r/) pages.
+
+![](./images/biodata_advanced.png "BioDATA banner")
+
